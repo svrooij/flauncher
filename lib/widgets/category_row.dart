@@ -23,9 +23,10 @@ import 'package:flauncher/widgets/categories_dialog.dart';
 import 'package:flauncher/widgets/ensure_visible.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
-class CategoryRow extends StatelessWidget {
+class CategoryRow extends StatefulWidget {
   final Category category;
   final List<App> applications;
 
@@ -36,49 +37,85 @@ class CategoryRow extends StatelessWidget {
   }) : super(key: key);
 
   @override
-  Widget build(BuildContext context) => Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: EdgeInsets.only(left: 16, bottom: 8),
-            child: Text(category.name,
-                style: Theme.of(context)
-                    .textTheme
-                    .headline6!
-                    .copyWith(shadows: [Shadow(color: Colors.black54, offset: Offset(1, 1), blurRadius: 8)])),
-          ),
-          SizedBox(
-            height: 110,
-            child: applications.isNotEmpty
-                ? ListView.custom(
-                    padding: EdgeInsets.all(8),
-                    scrollDirection: Axis.horizontal,
-                    childrenDelegate: SliverChildBuilderDelegate(
-                      (context, index) => EnsureVisible(
-                        key: Key("${category.id}-${applications[index].packageName}"),
-                        alignment: 0.1,
-                        child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: 8),
-                          child: AppCard(
-                            category: category,
-                            application: applications[index],
-                            autofocus: index == 0,
-                            onMove: (direction) => _onMove(context, direction, index),
-                            onMoveEnd: () => _onMoveEnd(context),
+  State<CategoryRow> createState() => _CategoryRowState();
+}
+
+class _CategoryRowState extends State<CategoryRow> {
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _focusNode = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Focus(
+        canRequestFocus: false,
+        focusNode: _focusNode,
+        child: FocusScope(
+          onKey: (node, event) {
+            if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowUp) {
+              _focusNode.focusInDirection(TraversalDirection.up);
+              return KeyEventResult.handled;
+            }
+            if (event is RawKeyDownEvent && event.logicalKey == LogicalKeyboardKey.arrowDown) {
+              _focusNode.focusInDirection(TraversalDirection.down);
+              return KeyEventResult.handled;
+            }
+            return KeyEventResult.ignored;
+          },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: EdgeInsets.only(left: 16, bottom: 8),
+                child: Text(widget.category.name,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headline6!
+                        .copyWith(shadows: [Shadow(color: Colors.black54, offset: Offset(1, 1), blurRadius: 8)])),
+              ),
+              SizedBox(
+                height: 110,
+                child: widget.applications.isNotEmpty
+                    ? ListView.custom(
+                        padding: EdgeInsets.all(8),
+                        scrollDirection: Axis.horizontal,
+                        childrenDelegate: SliverChildBuilderDelegate(
+                          (context, index) => EnsureVisible(
+                            key: Key("${widget.category.id}-${widget.applications[index].packageName}"),
+                            alignment: 0.1,
+                            child: Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 8),
+                              child: AppCard(
+                                category: widget.category,
+                                application: widget.applications[index],
+                                autofocus: index == 0,
+                                onMove: (direction) => _onMove(context, direction, index),
+                                onMoveEnd: () => _onMoveEnd(context),
+                              ),
+                            ),
                           ),
+                          childCount: widget.applications.length,
+                          findChildIndexCallback: _findChildIndex,
                         ),
-                      ),
-                      childCount: applications.length,
-                      findChildIndexCallback: _findChildIndex,
-                    ),
-                  )
-                : _emptyState(context),
+                      )
+                    : _emptyState(context),
+              ),
+            ],
           ),
-        ],
+        ),
       );
 
-  int _findChildIndex(Key key) =>
-      applications.indexWhere((app) => "${category.id}-${app.packageName}" == (key as ValueKey<String>).value);
+  int _findChildIndex(Key key) => widget.applications
+      .indexWhere((app) => "${widget.category.id}-${app.packageName}" == (key as ValueKey<String>).value);
 
   Widget _emptyState(BuildContext context) => EnsureVisible(
         alignment: 0.1,
@@ -113,7 +150,7 @@ class CategoryRow extends StatelessWidget {
     int? newIndex;
     switch (direction) {
       case AxisDirection.right:
-        if (index < applications.length - 1) {
+        if (index < widget.applications.length - 1) {
           newIndex = index + 1;
         }
         break;
@@ -127,12 +164,12 @@ class CategoryRow extends StatelessWidget {
     }
     if (newIndex != null) {
       final appsService = context.read<AppsService>();
-      appsService.reorderApplication(category, index, newIndex);
+      appsService.reorderApplication(widget.category, index, newIndex);
     }
   }
 
   void _onMoveEnd(BuildContext context) {
     final appsService = context.read<AppsService>();
-    appsService.saveOrderInCategory(category);
+    appsService.saveOrderInCategory(widget.category);
   }
 }

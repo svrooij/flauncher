@@ -18,6 +18,7 @@
 
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flauncher/smooth_reading_order_traversal_policy.dart';
 import 'package:flauncher/providers/apps_service.dart';
 import 'package:flauncher/providers/settings_service.dart';
 import 'package:flauncher/providers/wallpaper_service.dart';
@@ -104,11 +105,27 @@ class FLauncherApp extends StatelessWidget {
           home: Builder(
             builder: (context) => WillPopScope(
               onWillPop: () => _shouldPopScope(context),
-              child: FLauncher(),
+              child: FocusTraversalGroup(
+                policy: SmoothReadingOrderTraversalPolicy(requestFocusCallback: _focusAndEnsureVisible),
+                child: FLauncher(),
+              ),
             ),
           ),
         ),
       );
 
   Future<bool> _shouldPopScope(BuildContext context) async => !(await context.read<AppsService>().isDefaultLauncher());
+}
+
+void _focusAndEnsureVisible(
+  FocusNode node, {
+  ScrollPositionAlignmentPolicy alignmentPolicy = ScrollPositionAlignmentPolicy.explicit,
+}) {
+  node.requestFocus();
+  Scrollable.ensureVisible(
+    node.context!,
+    alignment: 1.0,
+    alignmentPolicy: alignmentPolicy,
+    duration: Duration(milliseconds: 150),
+  );
 }
